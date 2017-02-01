@@ -3,14 +3,18 @@
     Maintenance functions for WSUS.
 .DESCRIPTION
     This scripts supplies a WSUS administrator with a function to perform a thorough WSUS cleanup.
-    It also contains a function to auto-approve updates (but not upgrades) that are older than 30 days of age.
+    It also contains a function to auto-approve updates belonging to given categories that are older
+    than a given number of days.
 .NOTES
-    Version:       1.1
+    Version:       2.0
     Author:        Gonçalo Lourenço (goncalo.lourenco@gonksys.com)
     Creation Date: 03 January, 2017
     
     1.0: Initial script development.
     1.1: Start-WSUSCleanup - Gets a local WSUS server first before running the cleanup cmdlet.
+    2.0: Approve-WsusUpdatesForGroup - approves updates for given categories instead of excluding
+            updates belonging to give categories; IUpdateServer must be given as argument.
+         Start-WSUSCleanup - Takes an IUpdateServer as argument.
 
     For Update Classification GUIDs, see:
         https://msdn.microsoft.com/en-us/library/ff357803(v=vs.85).aspx
@@ -32,87 +36,79 @@ $UpdateRollupsClassificationGuid = [GUID]("28bc880e-0592-4cbf-8f95-c79b17911d5f"
 $UpdatesClassificationGuid = [GUID]("cd5ffd1e-e932-4e3a-bf74-18bf0b1bbd83");
 $UpgradesClassificationGuid = [GUID]("3689bdc8-b205-4af4-8d4a-a63924c5e9d5");
 
-Function Start-WSUSCleanup
-{
-    Get-WsusServer | Invoke-WsusServerCleanup -CleanupObsoleteComputers -CleanupObsoleteUpdates `
-      -CleanupUnneededContentFiles -DeclineExpiredUpdates -DeclineSupersededUpdates;
-}
-
-Function Approve-WSUSUpdatesForGroup
+Function Start-WsusCleanup
 {
     [CmdletBinding(DefaultParameterSetName = "Default")]
     Param(
-        [Parameter(Mandatory = $True, ParameterSetName = "WSUS Connection", Position = 0)]
-        [Parameter(Mandatory = $True, ParameterSetName = "Default", Position = 0)]
-        [string[]]$updateGroupList,
+        [Parameter(Mandatory = $True, ParameterSetName = "Default", ValueFromPipeline = $True, Position = 0)]
+        [Microsoft.UpdateServices.Administration.IUpdateServer]$WsusServer
+    )
 
-        [Parameter(Mandatory = $True, ParameterSetName = "WSUS Connection", Position = 1)]
-        [Parameter(Mandatory = $True, ParameterSetName = "Default", Position = 1)]
+    Invoke-WsusServerCleanup -UpdateServer $WsusServer -CleanupObsoleteComputers -CleanupObsoleteUpdates `
+        -CleanupUnneededContentFiles -DeclineExpiredUpdates -DeclineSupersededUpdates;
+}
+
+Function Approve-WsusUpdatesForGroup
+{
+    [CmdletBinding(DefaultParameterSetName = "Default")]
+    Param(
+        [Parameter(Mandatory = $True, HelpMessage = "List of names of WSUS Update Groups.",
+                   ParameterSetName = "Default", Position = 0)]
+        [String[]]$UpdateGroupList,
+
+        [Parameter(Mandatory = $True, HelpMessage = "List of categories for which to approve updates.",
+                   ParameterSetName = "Default", Position = 1)]
         [AllowEmptyString()]
         [ValidateNotNull()]
         [ValidateSet("Applications", "Connectors", "CriticalUpdates", "DefinitionUpdates", "DeveloperKits", "Drivers", "FeaturePacks",
                      "Guidance", "SecurityUpdates", "ServicePacks", "Tools", "UpdateRollups", "Updates", "Upgrades")]
-        [string[]]$excludedUpdateCategories,
+        [String[]]$UpdateCategories,
         
-        [Parameter(Mandatory = $False, ParameterSetName = "WSUS Connection", Position = 2)]
-        [Parameter(Mandatory = $False, ParameterSetName = "Default", Position = 2)]
-        [Int32]$updateDelay = 0,
-        
-        [Parameter(Mandatory = $False, ParameterSetName = "WSUS Connection")]
-        [string]$wsusServerName = "localhost",
+        [Parameter(Mandatory = $True, ParameterSetName = "Default", ValueFromPipeline = $True, Position = 2)]
+        [Microsoft.UpdateServices.Administration.IUpdateServer]$WsusServer,
 
-        [Parameter(Mandatory = $False, ParameterSetName = "WSUS Connection")]
-        [switch]$wsusServerSsl = $False,
-
-        [Parameter(Mandatory = $False, ParameterSetName = "WSUS Connection")]
-        [Int32]$wsusServerPort = 8530
+        [Parameter(Mandatory = $False, ParameterSetName = "Default", Position = 3)]
+        [Int32]$UpdateDelay = 0
     )
-
-    # If SSL flag was passed but port wasn't changed from default, set WSUS port to default SSL port.
-    if ($wsusServerSsl -and -not $PSBoundParameters.ContainsKey("wsusServerPort")) {$wsusServerPort = 8531;}
-
-    # Get an object representation of the WSUS server.
-    if ($wsusServerSsl) {$wsusServer = Get-WsusServer -Name $wsusServerName -UseSsl -PortNumber $wsusServerPort;}
-    else                {$wsusServer = Get-WsusServer -Name $wsusServerName -PortNumber $wsusServerPort;}
 
     # Create the update scope that'll filter out updates from our search.
     $updateScope = New-Object Microsoft.UpdateServices.Administration.UpdateScope;
 
     # Calculate the update delay.
     $currentDate = Get-Date;
-    $maxUpdateReleaseDate = $currentDate.AddDays(-$updateDelay);
+    $maxUpdateReleaseDate = $currentDate.AddDays(-$UpdateDelay);
     $updateScope.ToCreationDate = $maxUpdateReleaseDate;
 
-    # Create an ArrayList of classification types to filter out from the automatic approval.
-    $classificationFilterList = New-Object System.Collections.ArrayList;
-    foreach ($categoryToExclude in $excludedUpdateCategories)
+    # Create an ArrayList of classification types to filter the automatic approval.
+    $classificationFilterList = New-Object System.Collections.ArrayList($null);
+    foreach ($categoryToInclude in $UpdateCategories)
     {
-        if ($categoryToExclude -eq "Applications") {$classificationFilterList.Add($ApplicationsClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "Connectors") {$classificationFilterList.Add($ConnectorsClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "CriticalUpdates") {$classificationFilterList.Add($CriticalUpdatesClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "DefinitionUpdates") {$classificationFilterList.Add($DefinitionUpdatesClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "DeveloperKits") {$classificationFilterList.Add($DeveloperKitsClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "Drivers") {$classificationFilterList.Add($DriversClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "FeaturePacks") {$classificationFilterList.Add($FeaturePacksClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "Guidance") {$classificationFilterList.Add($GuidanceClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "SecurityUpdates") {$classificationFilterList.Add($SecurityUpdatesClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "ServicePacks") {$classificationFilterList.Add($ServicePacksClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "Tools") {$classificationFilterList.Add($ToolsClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "UpdateRollups") {$classificationFilterList.Add($UpdateRollupsClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "Updates") {$classificationFilterList.Add($UpdatesClassificationGuid) > $null;}
-        if ($categoryToExclude -eq "Upgrades") {$classificationFilterList.Add($UpgradesClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "Applications") {$classificationFilterList.Add($ApplicationsClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "Connectors") {$classificationFilterList.Add($ConnectorsClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "CriticalUpdates") {$classificationFilterList.Add($CriticalUpdatesClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "DefinitionUpdates") {$classificationFilterList.Add($DefinitionUpdatesClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "DeveloperKits") {$classificationFilterList.Add($DeveloperKitsClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "Drivers") {$classificationFilterList.Add($DriversClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "FeaturePacks") {$classificationFilterList.Add($FeaturePacksClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "Guidance") {$classificationFilterList.Add($GuidanceClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "SecurityUpdates") {$classificationFilterList.Add($SecurityUpdatesClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "ServicePacks") {$classificationFilterList.Add($ServicePacksClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "Tools") {$classificationFilterList.Add($ToolsClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "UpdateRollups") {$classificationFilterList.Add($UpdateRollupsClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "Updates") {$classificationFilterList.Add($UpdatesClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "Upgrades") {$classificationFilterList.Add($UpgradesClassificationGuid) > $null;}
     }
-
-    $updateClassificationCollection = $wsusServer.GetUpdateClassifications() | Where-Object {-not $classificationFilterList.Contains($_.Id);}
+    $updateClassificationCollection = $WsusServer.GetUpdateClassifications() | Where-Object {$classificationFilterList.Contains($_.Id);}
     
+    # Define the classifications to approve updates for in the update scope.
     $updateScope.Classifications.Clear();
     $updateScope.Classifications.AddRange($updateClassificationCollection);
 
     # Computer Groups have unique names in WSUS, updateGroup will always return one result maximum.
-    foreach ($updateGroup in $updateGroupList)
+    foreach ($updateGroup in $UpdateGroupList)
     {
-        $updateGroup = $wsusServer.GetComputerTargetGroups() | Where-Object {$_.Name -eq $updateGroup};
-        $updateList = $wsusServer.GetUpdates($UpdateScope);
+        $updateGroup = $WsusServer.GetComputerTargetGroups() | Where-Object {$_.Name -eq $updateGroup;}
+        $updateList = $WsusServer.GetUpdates($updateScope);
         
         foreach ($update in $updateList)
         {
@@ -127,9 +123,3 @@ Function Approve-WSUSUpdatesForGroup
         }
     }
 }
-
-#Get-Command Approve-WSUSUpdatesForGroup -Syntax
-
-#$UPDATE_GROUP = "Workstations";
-#$UPDATE_DELAY = 30;
-#Approve-WSUSUpdatesForGroup -updateGroup $UPDATE_GROUP -excludedUpdateCategories Upgrades -updateDelay $UPDATE_DELAY;
