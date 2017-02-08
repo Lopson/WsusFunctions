@@ -24,7 +24,7 @@ $wsus = Get-WsusServer;
 $delayInDays = 30;
 $wsusGroups = @("Workstations");
 $wsusCategories = @("CriticalUpdates", "DefinitionUpdates", "FeaturePacks", "SecurityUpdates", "ServicePacks", "Updates");
-$logFile = "C:\Logs\WsusTask.log"
+$logFile = "C:\Logs\WsusTask.log";
 
 # Print log header.
 $date = Get-Date;
@@ -48,4 +48,4 @@ Start-WsusCleanup -WsusServer $wsus | Out-File -Encoding utf8 -Append -NoClobber
 
 ---------------
 
-"@ | Out-File -Encoding utf8 -Append -NoClobber -FilePath $logFile;;
+"@ | Out-File -Encoding utf8 -Append -NoClobber -FilePath $logFile;
