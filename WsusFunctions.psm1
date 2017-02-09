@@ -101,20 +101,20 @@ Function Approve-WsusUpdatesForGroup
     $classificationFilterList = New-Object System.Collections.ArrayList($null);
     foreach ($categoryToInclude in $UpdateCategories)
     {
-        if ($categoryToInclude -eq "Applications") {$classificationFilterList.Add($ApplicationsClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "Connectors") {$classificationFilterList.Add($ConnectorsClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "CriticalUpdates") {$classificationFilterList.Add($CriticalUpdatesClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "DefinitionUpdates") {$classificationFilterList.Add($DefinitionUpdatesClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "DeveloperKits") {$classificationFilterList.Add($DeveloperKitsClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "Drivers") {$classificationFilterList.Add($DriversClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "FeaturePacks") {$classificationFilterList.Add($FeaturePacksClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "Guidance") {$classificationFilterList.Add($GuidanceClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "SecurityUpdates") {$classificationFilterList.Add($SecurityUpdatesClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "ServicePacks") {$classificationFilterList.Add($ServicePacksClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "Tools") {$classificationFilterList.Add($ToolsClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "UpdateRollups") {$classificationFilterList.Add($UpdateRollupsClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "Updates") {$classificationFilterList.Add($UpdatesClassificationGuid) > $null;}
-        if ($categoryToInclude -eq "Upgrades") {$classificationFilterList.Add($UpgradesClassificationGuid) > $null;}
+        if ($categoryToInclude -eq "Applications") {$classificationFilterList.Add($ApplicationsClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "Connectors") {$classificationFilterList.Add($ConnectorsClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "CriticalUpdates") {$classificationFilterList.Add($CriticalUpdatesClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "DefinitionUpdates") {$classificationFilterList.Add($DefinitionUpdatesClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "DeveloperKits") {$classificationFilterList.Add($DeveloperKitsClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "Drivers") {$classificationFilterList.Add($DriversClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "FeaturePacks") {$classificationFilterList.Add($FeaturePacksClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "Guidance") {$classificationFilterList.Add($GuidanceClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "SecurityUpdates") {$classificationFilterList.Add($SecurityUpdatesClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "ServicePacks") {$classificationFilterList.Add($ServicePacksClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "Tools") {$classificationFilterList.Add($ToolsClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "UpdateRollups") {$classificationFilterList.Add($UpdateRollupsClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "Updates") {$classificationFilterList.Add($UpdatesClassificationGuid) | Out-Null;}
+        if ($categoryToInclude -eq "Upgrades") {$classificationFilterList.Add($UpgradesClassificationGuid) | Out-Null;}
     }
     $updateClassificationCollection = $WsusServer.GetUpdateClassifications() | Where-Object {$classificationFilterList.Contains($_.Id);}
     
@@ -134,8 +134,8 @@ Function Approve-WsusUpdatesForGroup
             # NOTE: We're not declining superseded updates in this function; that should be done by the Cleanup procedure.
             if (-not $update.IsApproved -and -not $update.IsDeclined -and -not $update.IsSuperseded -and $update.IsLatestRevision)
             {
-                if ($update.RequiresLicenseAgreementAcceptance) {$update.AcceptLicenseAgreement() > $null;}
-                $update.Approve('Install', $updateGroup) > $null;
+                if ($update.RequiresLicenseAgreementAcceptance) {$update.AcceptLicenseAgreement() | Out-Null;}
+                $update.Approve('Install', $updateGroup) | Out-Null;
                 Write-Output ("Approving '{0}' with classification '{1}' for update group '{2}'." -f $update.Title, $update.UpdateClassificationTitle, $updateGroup.Name);
             }
         }
