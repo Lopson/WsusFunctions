@@ -19,6 +19,9 @@
     1.0: Script creation.
 #>
 
+# Import the required modules.
+Import-Module WsusFunctions;
+
 # Set update approval parameters.
 $wsus = Get-WsusServer;
 $delayInDays = 30;
