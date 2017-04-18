@@ -8,7 +8,7 @@
     server's storage.
 
     This script depends on the WsusFunctions module, located at:
-        C:\Windows\System32\WindowsPowerShell\v1.0\Modules\WsusFunctions
+        C:\Program Files\WindowsPowerShell\Modules\WsusFunctions
     This module was developed in-house at GONKSYS, S.A.
 
 .NOTES
@@ -17,6 +17,7 @@
     Creation Date: 01 February, 2017
     
     1.0: Script creation.
+    1.1: Redirected STDERR to STDOUT to help in debugging.
 #>
 
 # Import the required modules.
@@ -43,8 +44,8 @@ Update Categories: $wsusCategories
 
 # Perform update approval and perform a server cleanup.
 Approve-WsusUpdatesForGroup -UpdateGroupList $wsusGroups -UpdateCategories $wsusCategories -WsusServer $wsus `
-    -UpdateDelay $delayInDays | Out-File -Encoding utf8 -Append -NoClobber -FilePath $logFile;
-Start-WsusCleanup -WsusServer $wsus | Out-File -Encoding utf8 -Append -NoClobber -FilePath $logFile;
+    -UpdateDelay $delayInDays 2>&1 | Out-File -Encoding utf8 -Append -NoClobber -FilePath $logFile;
+Start-WsusCleanup -WsusServer $wsus 2>&1 | Out-File -Encoding utf8 -Append -NoClobber -FilePath $logFile;
 
 # Print end-of-log footer.
 @"
