@@ -56,3 +56,21 @@ Also, don't forget to add read permissions for the gMSA on the folder in which t
 
 ### Out-Null vs $null
 One more note regarding the module and Powershell in general: redirecting output to `$null` is much faster than pipelining to `Out-Null`. The latter one seems to get tangle dup in garbage collection affairs, as seen in [this StackOverflow question](http://stackoverflow.com/questions/5260125/whats-the-better-cleaner-way-to-ignore-output-in-powershell).
+
+## Debugging
+
+Whether you're using the default permissions for the WSUS service or you're using a gMSA as described in the previous section, you'll probably come accross some odd issue that you weren't predicting, be it the usual [KB3159706](https://support.microsoft.com/en-us/help/3159706/update-enables-esd-decryption-provision-in-wsus-in-windows-server-2012-and-windows-server-2012-r2) problems in WS2012R2 or some other one.
+
+The easiest way to debug the script's execution is to start a PowerShell process using the account that's running the Scheduled Task based on this module. To do that, you'll need SysInternals' PsExec. This program allows you to do a few cool things, like starting processes under any account (the most interesting one being the `NT AUTHORITY\SYSTEM` account), be they interactive or non-interactive. Careful though, as this program has both a 32-bits and a 64-bits version; depending on where the module is installed, you're going to have to choose one of the two versions.
+
+PsExec won't ask for a password if you're starting a process under the `NT AUTHORITY\SYSTEM` account, but it most definitely will when you're trying to use a gMSA. While the idea behind a gMSA is for neither you nor anyone besides the machine in which it's installed to know the account's password, nothing's stopping you from getting it. All you have to do is alter the `PrincipalsAllowedToRetrieveManagedPassword` property via the `Set-ADServiceAccount` cmdlet to add yourself into that list of principals. The property that contains the gMSA's password is called `msDS-ManagedPassword`. With a little help from [DSInternals](https://github.com/MichaelGrafnetter/DSInternals), you can get a gMSA's password via the following commands:
+
+```
+Import-Module DSInternals
+
+$gmsa = Get-ADServiceAccount -Identity 'gMSA_account_name' -Properties 'msDS-ManagedPassword'
+$mp = $gmsa.'msDS-ManagedPassword'
+ConvertFrom-ADManagedPasswordBlob $mp | Out-File -Encoding utf8 -Append -NoClobber -FilePath "gmsa_password.txt"
+```
+
+The Out-File in UTF-8 is critical, since these passwords are UTF-8 based. Don't be surprised if you see oriental characters all over the place!
