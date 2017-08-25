@@ -6,9 +6,9 @@
     It also contains a function to auto-approve updates belonging to given categories that are older
     than a given number of days.
 .NOTES
-    Version:       2.0
+    Version:       2.1
     Author:        Gonçalo Lourenço (goncalo.lourenco@gonksys.com)
-    Creation Date: 03 January, 2017
+    Creation Date: 15 August, 2017
     
     1.0: Initial script development.
     1.1: Start-WSUSCleanup - Gets a local WSUS server first before running the cleanup cmdlet.
@@ -16,6 +16,7 @@
             updates belonging to give categories; UpdateServer must be given as argument; Array
             parameters are now properly validated; $UpdateDelay's value is now validated.
          Start-WSUSCleanup - Takes an UpdateServer as argument.
+    2.1: Approve-WsusUpdatesForGroup - Simplified the way that given update groups are validated.
 
     For Update Classification GUIDs, see:
         https://msdn.microsoft.com/en-us/library/ff357803(v=vs.85).aspx
@@ -79,14 +80,10 @@ Function Approve-WsusUpdatesForGroup
     $UpdateCategories = $UpdateCategories | Select-Object -Unique;
 
     # Validate that all given update groups exist in the given WSUS server.
-    [String[]]$updateGroupNames = $WsusServer.GetComputerTargetGroups() | ForEach-Object {$_.Name;}
-    $updateGroupNamesArrayList = [System.Collections.ArrayList]$updateGroupNames;
-    foreach ($updateGroupGiven in $UpdateGroupList)
+    foreach($UpdateGroupGiven in $UpdateGroupList)
     {
-        if (-not $updateGroupNamesArrayList.Contains($updateGroupGiven))
-        {
-            throw [System.ArgumentOutOfRangeException] "Update group $updateGroupGiven doesn't exist in Update Server $($WsusServer.Name).";
-        }
+        try   {Get-WsusComputer -UpdateServer $WsusServer -ComputerTargetGroups $UpdateGroupGiven > $null;}
+        catch {throw [System.ArgumentOutOfRangeException] "Update group $UpdateGroupGiven doesn't exist in Update Server $($WsusServer.Name).";}
     }
 
     # Create the update scope that'll filter out updates from our search.
